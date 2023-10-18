@@ -1,0 +1,87 @@
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+
+
+
+data = pd.read_csv('./digit-recognizer/train.csv')
+#shuffling data before splitting into testing and training data
+np.random.shuffle(data)
+#based on the layout of the csv file, we will define 
+#m is the number of examples
+#n is the number of input values per example
+m, n = data.shape 
+
+#grabs the first 1000 rows (aka first 1000 examples)
+test_data = data[0:1000].T
+
+y_test_data = test_data[0]
+
+x_test_data = test_data[1:n] / 255
+
+
+#grabs the first remaing rows (aka remaining examples)
+train_data = data[1000:m].T
+
+#grabs all the remaining examples where each column represents an example and scales each element down to a number between 0 and 1
+x_train_data = train_data[1:n] / 255
+
+#grabs the label for the remaining examples
+y_train_data = train_data[0]
+
+
+#creates our weight matrices that are randomly generated values between -1 and 1
+
+def intial_paramaters():
+    w1 = np.random.uniform(-1,1,size=(16,x_train_data.shape[0]))
+    w2 = np.random.uniform(-1,1,size=(16,16))
+    w3 = np.random.uniform(-1,1,size=(10,16))
+    b1 = np.zeros((10,1))
+    b2 = np.zeros((10,1))
+    b3 = np.zeros((10,1))
+    return w1, w2, w3, b1, b2, b3
+
+def RelU(x):
+    A = np.maximum(0, x)
+    return A
+
+def derivative_RelU(Z):
+    F = Z > 0
+    derivRelu = F.astype(int)
+    return derivRelu
+
+#hot-encodes the actual answer into a 10xm matrix, where the correct answer lies in the index of the matrix as a 1
+def correct_answer(Y):
+    correct_y_values = np.zeros((Y.size, 10))
+    correct_y_values[np.arange(1,Y.size), Y] = 1
+    return correct_y_values
+
+def softmax(x):
+    A3 = np.exp(x) / sum(np.exp(x))
+    return A3
+
+def forward_propagation(x, w1, w2, w3, b1, b2, b3):
+    Z1 = np.dot(w1,x) + b1
+    A1 = RelU(Z1)
+    Z2 = np.dot(w2,A1) + b2
+    A2 = RelU(Z2)
+    Z3 = np.dot(w3,A2) + b3
+    A3 = softmax(Z3)
+    return Z1, Z2, Z3, A1, A2, A3
+
+def derivative_softmax(x):
+    s = softmax(x)
+    return s * (1 - s)
+
+def backwards_propagation():
+    dZ1 = 
+    dZ2 = 
+    dZ3 = 
+    dw1 = 
+    dw2 = 
+    dw3 = 
+    db1 = 
+    db2 = 
+    db3 = 
+
+
