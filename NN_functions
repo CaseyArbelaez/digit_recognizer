@@ -2,11 +2,12 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-
-
 data = pd.read_csv('./digit-recognizer/train.csv')
+data = np.array(data)
+
 #shuffling data before splitting into testing and training data
 np.random.shuffle(data)
+
 #based on the layout of the csv file, we will define 
 #m is the number of examples
 #n is the number of input values per example
@@ -15,8 +16,7 @@ m, n = data.shape
 #grabs the first 1000 rows (aka first 1000 examples)
 test_data = data[0:1000].T
 
-y_test_data = test_data[0]
-
+y_test_data = test_data[0] #dimension of 1x1000 #as opposed to [0:1, :]
 x_test_data = test_data[1:n] / 255
 
 
@@ -27,38 +27,82 @@ train_data = data[1000:m].T
 x_train_data = train_data[1:n] / 255
 
 #grabs the label for the remaining examples
-y_train_data = train_data[0]
+y_train_data = train_data[0] #as opposed to [0:1, :]
 
 
 #creates our weight matrices that are randomly generated values between -1 and 1
 
-def intial_paramaters():
-    w1 = np.random.uniform(-1,1,size=(16,x_train_data.shape[0]))
-    w2 = np.random.uniform(-1,1,size=(16,16))
-    w3 = np.random.uniform(-1,1,size=(10,16))
-    b1 = np.zeros((10,1))
-    b2 = np.zeros((10,1))
+def intial_paramaters(nodes_hidden):
+    # w1 = np.random.uniform(-1,1,size=(nodes_hidden,x_train_data.shape[0])) * 0.01
+    # w2 = np.random.uniform(-1,1,size=(nodes_hidden,nodes_hidden)) * 0.01
+    # w3 = np.random.uniform(-1,1,size=(10,nodes_hidden)) * 0.01
+    w1 = np.random.randn(nodes_hidden,x_train_data.shape[0]) * 0.1
+    w2 = np.random.randn(nodes_hidden,nodes_hidden) * 0.1
+    w3 = np.random.randn(10,nodes_hidden) * 0.1
+    b1 = np.zeros((nodes_hidden,1))
+    b2 = np.zeros((nodes_hidden,1))
     b3 = np.zeros((10,1))
+
     return w1, w2, w3, b1, b2, b3
 
 def RelU(x):
     A = np.maximum(0, x)
     return A
-
 def derivative_RelU(Z):
     F = Z > 0
     derivRelu = F.astype(int)
     return derivRelu
 
+#if we want to modify our activation function than we can use tanh instead of relu but im going to first use relu
+def tanh(x):
+    return np.tanh(x)
+def derivative_tanh(x):
+    x = np.exp(x)
+    return x/np.sum(x, axis = 0)
+
 #hot-encodes the actual answer into a 10xm matrix, where the correct answer lies in the index of the matrix as a 1
 def correct_answer(Y):
-    correct_y_values = np.zeros((Y.size, 10))
-    correct_y_values[np.arange(1,Y.size), Y] = 1
+    correct_y_values = np.zeros((Y.size, Y.max() + 1))
+    correct_y_values[np.arange(Y.size), Y] = 1
+    correct_y_values = correct_y_values.T
     return correct_y_values
 
+# def softmax(x):
+#     A3 = np.exp(x) / np.sum(np.exp(x), axis = 0)
+#     return A3
+
+# def softmax(x):                                       used different softmax functions because my  NN was having difficulty with some
+#     expX = np.exp(x)
+#     return expX/np.sum(expX)
+
 def softmax(x):
-    A3 = np.exp(x) / sum(np.exp(x))
-    return A3
+    expX = np.exp(x)
+    return expX/np.sum(expX, axis = 0)
+
+# def softmax(x):
+#     e_x = np.exp(x - np.max(x))
+#     return e_x/e_x.sum()
+
+# def derivative_softmax(x):            Do not need because it dz3 simplifies nicely :)
+#     s = softmax(x)
+#     return s * (1 - s)
+
+
+#-------------------Evaluating predictions/testing for accuracy-------------------------
+
+
+def prediction(x):
+    guess = np.argmax(x, 0)
+    return guess
+
+def accuracy(predictions, Y):
+    score = np.sum(predictions == Y) / Y.size
+    score = round(score*100, 2)
+    return score
+
+
+#--------------------Forward Propagation begins-------------------------------------------
+
 
 def forward_propagation(x, w1, w2, w3, b1, b2, b3):
     Z1 = np.dot(w1,x) + b1
@@ -69,19 +113,113 @@ def forward_propagation(x, w1, w2, w3, b1, b2, b3):
     A3 = softmax(Z3)
     return Z1, Z2, Z3, A1, A2, A3
 
-def derivative_softmax(x):
-    s = softmax(x)
-    return s * (1 - s)
-
-def backwards_propagation():
-    dZ1 = 
-    dZ2 = 
-    dZ3 = 
-    dw1 = 
-    dw2 = 
-    dw3 = 
-    db1 = 
-    db2 = 
-    db3 = 
+def cost_function(A3, Y):
+    #A3 = np.clip(A3, 1e-7, 1 - 1e-7)
+    correct_y_values = correct_answer(Y)
+    m = Y.size
+    # m = Y.shape[1]  #Grabs the number of examples
+    cost = -(1/m)*np.sum(correct_y_values*np.log(A3))
+    return cost
 
 
+#---------------------Backward propagation begins------------------------------------------
+
+
+def backwards_propagation(x, Z1, Z2, Z3, Y, w1, w2, w3, A1, A2, A3):
+    m = Y.size
+    # m = Y.shape[1]
+    correct_y_values = correct_answer(Y)
+
+    dz3 = A3 - correct_y_values
+    dw3 = (1/m) * np.dot(dz3, A2.T)
+    db3 = (1/m) * np.sum(dz3, axis = 1, keepdims = True)
+
+    dz2 = np.dot(w3.T, dz3) * derivative_RelU(Z2)
+    dw2 = (1/m) * np.dot(dz2, A1.T)
+    db2 = (1/m) * np.sum(dz2, axis = 1, keepdims = True)
+
+    dz1 = np.dot(w2.T, dz2) * derivative_RelU(Z1)
+    dw1 = (1/m) * np.dot(dz1, x.T)
+    db1 = (1/m) * np.sum(dz1, axis = 1, keepdims = True)
+    return dw3, dw2, dw1, db3, db2, db1
+
+
+#--------------------------adjust parameters------------------------------------------
+
+
+def recalculate_paramaters(dw3, dw2, dw1, db3, db2, db1, w3, w2, w1, b3, b2, b1, learning_rate):
+    w1 = w1 - learning_rate*dw1
+    w2 = w2 - learning_rate*dw2
+    w3 = w3 - learning_rate*dw3
+    b1 = b1 - learning_rate*db1
+    b2 = b2 - learning_rate*db2
+    b3 = b3 - learning_rate*db3
+    return w1, w2, w3, b1, b2, b3
+
+
+#-------------------------Modeling the Neural Network-------------------------------------
+
+
+def neural_network(x, y, nodes_hidden, learning_rate, iterations):
+     
+    w1, w2, w3, b1, b2, b3 = intial_paramaters(nodes_hidden)
+    cost_array = []
+
+    for i in range(iterations):
+        Z1, Z2, Z3, A1, A2, A3 = forward_propagation(x, w1, w2, w3, b1, b2, b3)
+        cost = cost_function(A3, y)
+        
+        dw3, dw2, dw1, db3, db2, db1 = backwards_propagation(x, Z1, Z2, Z3, y, w1, w2, w3, A1, A2, A3)
+        w1, w2, w3, b1, b2, b3 = recalculate_paramaters(dw3, dw2, dw1, db3, db2, db1, w3, w2, w1, b3, b2, b1, learning_rate)
+
+        cost_array.append(cost)
+
+        guess = prediction(A3)
+        score = accuracy(guess, y)
+
+        if (i%(iterations/10) == 0):
+            print('Cost after', i, "iterations is:", cost)
+            print("Accuracy:", score, "%")
+
+    return w1, w2, w3, b1, b2, b3, cost_array
+
+
+# I want to measure the accuracy by changing the number of nodes in the hidden layer, iterations, and the learning rate, so uncomment if you want user input
+
+# nodes_hidden = int(input('How many nodes in the hidden layer? '))
+# learning_rate = float(input("What is the learning rate? "))
+# iterations = int(input("How many training iterations? "))
+
+nodes_hidden = 1000
+learning_rate = 0.05
+iterations = 100
+
+
+#--------------------------Calling the Neural Network with the data------------------------------
+
+
+w1, w2, w3, b1, b2, b3, cost_array = neural_network(x_train_data, y_train_data, nodes_hidden, learning_rate, iterations)
+
+
+#-----------------------------Graphing the total loss over Epoch----------------------------------------
+
+
+domain = np.arange(0, iterations)
+plt.plot(domain, cost_array)
+
+font1 = {'family':'serif','color':'purple','size':20}
+
+plt.title("Cost vs Iterations", fontdict = font1)
+plt.xlabel("Iterations")
+plt.ylabel("Average Cost")
+
+plt.show()
+
+
+def testing_predictions(x, y, w1, w2, w3, b1, b2, b3):
+    _, _, _, _, _, A3 = forward_propagation(x, w1, w2, w3, b1, b2, b3)
+    guess = prediction(A3)
+    score = accuracy(guess, y)
+    return print("Accuracy on Testing Data:",score)
+
+testing_predictions(x_test_data, y_test_data, w1, w2, w3, b1, b2, b3)
